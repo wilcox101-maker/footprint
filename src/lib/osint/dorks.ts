@@ -62,7 +62,14 @@ export function pivotResult(kind: Kind, target: string, host: string): ModuleRes
       ["Steam", `https://steamcommunity.com/id/${enc(user)}`],
       ["Keybase", `https://keybase.io/${enc(user)}`],
       ["Medium", `https://medium.com/@${enc(user)}`],
-      ["Hacker News", `https://news.ycombinator.com/user?id=${enc(user)}`],
+      ["Bluesky", `https://bsky.app/profile/${enc(user)}`],
+      ["Mastodon", `https://mastodon.social/@${enc(user)}`],
+      ["TikTok", `https://www.tiktok.com/@${enc(user)}`],
+      ["Pinterest", `https://www.pinterest.com/${enc(user)}/`],
+      ["Tumblr", `https://${enc(user)}.tumblr.com`],
+      ["LinkedIn", `https://www.linkedin.com/in/${enc(user)}`],
+      ["SoundCloud", `https://soundcloud.com/${enc(user)}`],
+      ["Wikipedia", `https://en.wikipedia.org/wiki/User:${enc(user)}`],
     ].map(([title, url]) => ({ title: title!, url: url! }));
   } else if (kind === "email") {
     links = [
@@ -71,6 +78,12 @@ export function pivotResult(kind: Kind, target: string, host: string): ModuleRes
       { title: "Have I Been Pwned", url: "https://haveibeenpwned.com/" },
       { title: "IntelX", url: `https://intelx.io/?s=${enc(target)}` },
       { title: "Paste sites", url: `https://www.google.com/search?q=${enc(`"${target}" (site:pastebin.com OR site:rentry.co)`)}` },
+    ];
+  } else if (kind === "phone") {
+    const digits = target.replace(/\D/g, "");
+    links = [
+      { title: "Search this number", url: `https://www.google.com/search?q=${enc(`"${digits}"`)}` },
+      { title: "Search the international form", url: `https://www.google.com/search?q=${enc(`"${target}"`)}` },
     ];
   } else if (kind === "ip") {
     links = [

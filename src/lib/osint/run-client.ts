@@ -1,5 +1,6 @@
 import { moduleDef } from "@/lib/osint/catalog";
 import { dorkResult, pivotResult } from "@/lib/osint/dorks";
+import { phoneResult } from "@/lib/osint/phone";
 import { hostFrom } from "@/lib/osint/guard";
 import { runModules } from "@/lib/osint/recon.functions";
 import {
@@ -56,6 +57,8 @@ export async function runCase(
         } else if (id === "pivots") {
           const host = hostFrom(file.kind, file.target);
           results = [pivotResult(file.kind, file.target, host || file.target)];
+        } else if (id === "phone") {
+          results = [phoneResult(file.target)];
         } else {
           const response = await runModules({
             data: {

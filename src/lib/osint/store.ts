@@ -89,6 +89,7 @@ function subjectType(kind: Kind): Entity["type"] {
   if (kind === "username") return "username";
   if (kind === "ip") return "ip";
   if (kind === "url") return "url";
+  if (kind === "phone") return "phone";
   return "domain";
 }
 

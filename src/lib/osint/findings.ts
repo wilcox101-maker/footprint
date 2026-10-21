@@ -14,7 +14,8 @@ export function riskOf(entity: Entity): RiskLevel {
     entity.relation === "malware-association" ||
     entity.relation === "malware-sample" ||
     entity.type === "breach" ||
-    entity.relation === "breach-title"
+    entity.relation === "breach-title" ||
+    entity.relation === "blocklist"
   ) {
     return "Critical";
   }
@@ -24,7 +25,7 @@ export function riskOf(entity: Entity): RiskLevel {
   if (entity.relation === "mail-gap" || entity.relation === "published-email" || entity.relation === "disposable-domain") {
     return "Medium";
   }
-  if (entity.relation === "header-gap") return "Low";
+  if (entity.relation === "header-gap" || entity.relation === "cookie-gap") return "Low";
   if (entity.severity === "high") return "High";
   if (entity.severity === "medium") return "Medium";
   if (entity.severity === "low") return "Low";
@@ -77,6 +78,12 @@ export function whatItMeans(entity: Entity): string {
 }
 
 export function howToFix(entity: Entity): string {
+  if (entity.relation === "blocklist") {
+    return "A public malware-URL list names this host. Check the listing, take the site offline if it is yours, and request removal from that list after it is clean.";
+  }
+  if (entity.relation === "cookie-gap") {
+    return "Set Secure and HttpOnly on that cookie, and SameSite where the browser should not send it on cross-site requests.";
+  }
   if (entity.title.includes("SPF") || entity.value.startsWith("spf-missing")) {
     return "Publish an SPF record that lists only the servers allowed to send for this domain. Move to a hard fail after you have watched a week of mail.";
   }

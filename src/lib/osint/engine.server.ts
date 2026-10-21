@@ -27,7 +27,7 @@ function rateOk() {
   return true;
 }
 
-type Got = { status: number; text: string; headers: Headers; url: string };
+type Got = { status: number; text: string; headers: Headers; url: string; hops?: number };
 
 async function getText(
   url: string,
@@ -1051,6 +1051,7 @@ async function safePage(url: string): Promise<Got> {
   const first = new URL(url);
   await assertResolvesPublic(first.hostname);
   let current = first;
+  let hops = 0;
   for (let hop = 0; hop < 3; hop += 1) {
     const res = await fetch(current.toString(), {
       redirect: "manual",
@@ -1066,10 +1067,11 @@ async function safePage(url: string): Promise<Got> {
       if (next.port && next.port !== "80" && next.port !== "443") throw new Error("Refusing unusual port.");
       await assertResolvesPublic(next.hostname);
       current = next;
+      hops += 1;
       continue;
     }
     const text = (await res.text()).slice(0, 120_000);
-    return { status: res.status, text, headers: res.headers, url: current.toString() };
+    return { status: res.status, text, headers: res.headers, url: current.toString(), hops };
   }
   throw new Error("Too many redirects.");
 }
@@ -1100,6 +1102,59 @@ async function modSurface(kind: Kind, target: string, domain: string, authorized
       }),
     );
     log.push(`Homepage HTTP ${home.status} ${title ? `“${title}”` : ""}`.trim());
+    const hops = home.hops ?? 0;
+    if (hops > 0) {
+      entities.push(
+        draft({
+          type: "url",
+          value: home.url,
+          severity: "info",
+          relation: "redirect",
+          source: "surface",
+          title: `Followed ${hops} redirect${hops === 1 ? "" : "s"}`,
+          meta: { finalUrl: home.url },
+        }),
+      );
+    }
+    const cookies = typeof home.headers.getSetCookie === "function" ? home.headers.getSetCookie() : [];
+    for (const raw of cookies.slice(0, 8)) {
+      const name = raw.split("=")[0]?.trim().slice(0, 80) || "cookie";
+      const flags = ["Secure", "HttpOnly", "SameSite"].filter((flag) => raw.toLowerCase().includes(flag.toLowerCase()));
+      const weak = !/secure/i.test(raw) || !/httponly/i.test(raw);
+      entities.push(
+        draft({
+          type: "tech",
+          value: `cookie:${domain}:${name}`,
+          severity: weak ? "low" : "info",
+          relation: weak ? "cookie-gap" : "cookie",
+          source: "surface",
+          title: weak ? `Cookie ${name} missing a flag` : `Cookie ${name}`,
+          meta: { flags: flags.join(", ") || "none", note: "Name and flags only. The cookie value is not stored." },
+        }),
+      );
+    }
+    const og = (prop: string) => {
+      const a = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)`, "i");
+      const b = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, "i");
+      return stripTags(home.text.match(a)?.[1] ?? home.text.match(b)?.[1] ?? "").slice(0, 140);
+    };
+    for (const [prop, label] of [
+      ["og:site_name", "Site name"],
+      ["og:title", "Social title"],
+    ] as const) {
+      const value = og(prop);
+      if (!value) continue;
+      entities.push(
+        draft({
+          type: "tech",
+          value: `${prop}:${domain}:${value}`,
+          severity: "info",
+          relation: "social-tag",
+          source: "surface",
+          title: `${label}: ${value}`,
+        }),
+      );
+    }
     if (server) {
       entities.push(draft({ type: "tech", value: server, severity: "info", relation: "fingerprint", source: "surface", title: `Server ${server}` }));
     }
@@ -2199,6 +2254,162 @@ async function modCode(kind: Kind, target: string, domain: string): Promise<Modu
   return finish("code", started, entities, log.length ? log : ["No public code mentions."]);
 }
 
+async function modDnssec(domain: string): Promise<ModuleResult> {
+  const started = Date.now();
+  const log: string[] = [];
+  try {
+    const res = await getText(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=DS`);
+    if (res.status !== 200) return fail("dnssec", started, new Error(`DNS HTTP ${res.status}`), log);
+    const data = JSON.parse(res.text) as { Status?: number; Answer?: { data?: string }[] };
+    const published = data.Status === 0 && (data.Answer?.length ?? 0) > 0;
+    log.push(published ? "DS record published." : "No DS record in the public resolver.");
+    return finish("dnssec", started, [
+      draft({
+        type: "finding",
+        value: `dnssec:${domain}`,
+        severity: "info",
+        relation: "dnssec",
+        source: "dns",
+        title: published ? "DNSSEC DS published" : "No DS record published",
+        meta: { domain },
+      }),
+    ], log);
+  } catch (error) {
+    return fail("dnssec", started, error, log);
+  }
+}
+
+async function modBlocklist(kind: Kind, target: string, domain: string): Promise<ModuleResult> {
+  const started = Date.now();
+  const host = kind === "ip" ? target : domain;
+  const log: string[] = [];
+  try {
+    const res = await fetch("https://urlhaus-api.abuse.ch/v1/host/", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": UA, accept: "application/json" },
+      body: new URLSearchParams({ host }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    const text = await res.text();
+    if (res.status !== 200) return fail("blocklist", started, new Error(`URLhaus HTTP ${res.status}`), log);
+    const data = JSON.parse(text) as { query_status?: string; url_count?: number };
+    const listed = data.query_status === "ok" || data.query_status === "is_host";
+    log.push(listed ? `URLhaus lists ${host}.` : "URLhaus has no malware URL for this host.");
+    if (!listed) return finish("blocklist", started, [], log);
+    return finish("blocklist", started, [
+      draft({
+        type: "finding",
+        value: `urlhaus:${host}`,
+        severity: "high",
+        relation: "blocklist",
+        source: "urlhaus",
+        title: "Listed on URLhaus",
+        meta: { host, urls: String(data.url_count ?? "") },
+      }),
+    ], log);
+  } catch (error) {
+    return fail("blocklist", started, error, log);
+  }
+}
+
+async function modGreen(domain: string): Promise<ModuleResult> {
+  const started = Date.now();
+  const log: string[] = [];
+  try {
+    const res = await getText(`https://api.thegreenwebfoundation.org/greencheck/${encodeURIComponent(domain)}`);
+    if (res.status !== 200) return fail("green", started, new Error(`Green Web HTTP ${res.status}`), log);
+    const data = JSON.parse(res.text) as { green?: boolean; hosted_by?: string; data?: boolean };
+    const green = Boolean(data.green);
+    log.push(green ? "Green Web lists this host." : "Not in the Green Web dataset.");
+    return finish("green", started, [
+      draft({
+        type: "finding",
+        value: `green:${domain}`,
+        severity: "info",
+        relation: "green-host",
+        source: "greenweb",
+        title: green ? "Listed as green hosted" : "Not in the Green Web dataset",
+        meta: { host: data.hosted_by ?? "" },
+      }),
+    ], log);
+  } catch (error) {
+    return fail("green", started, error, log);
+  }
+}
+
+async function modHandles(username: string): Promise<ModuleResult> {
+  const started = Date.now();
+  const user = username.replace(/^@/, "");
+  const log: string[] = [];
+  const entities: EntityDraft[] = [];
+  const checks: { site: string; url: string; hit: (status: number, text: string) => boolean }[] = [
+    {
+      site: "Bluesky",
+      url: `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(user)}`,
+      hit: (status) => status === 200,
+    },
+    {
+      site: "Reddit",
+      url: `https://www.reddit.com/user/${encodeURIComponent(user)}/about.json`,
+      hit: (status, text) => status === 200 && text.includes(`"name"`),
+    },
+    {
+      site: "Hacker News",
+      url: `https://hacker-news.firebaseio.com/v0/user/${encodeURIComponent(user)}.json`,
+      hit: (status, text) => status === 200 && text.trim() !== "null" && text.includes(`"id"`),
+    },
+    {
+      site: "Chess.com",
+      url: `https://api.chess.com/pub/player/${encodeURIComponent(user)}`,
+      hit: (status) => status === 200,
+    },
+    {
+      site: "Dev.to",
+      url: `https://dev.to/api/users/by_username?url=${encodeURIComponent(user)}`,
+      hit: (status, text) => status === 200 && text.includes(`"username"`),
+    },
+    {
+      site: "Lemmy",
+      url: `https://lemmy.world/api/v3/user?username=${encodeURIComponent(user)}`,
+      hit: (status, text) => status === 200 && text.includes(`"person"`),
+    },
+    {
+      site: "Wikipedia",
+      url: `https://en.wikipedia.org/w/api.php?action=query&list=users&ususers=${encodeURIComponent(user)}&format=json`,
+      hit: (status, text) => status === 200 && text.includes(`"userid"`),
+    },
+  ];
+  let errors = 0;
+  await Promise.all(
+    checks.map(async (check) => {
+      try {
+        const res = await getText(check.url, { timeout: 8_000, max: 80_000 });
+        if (check.hit(res.status, res.text)) {
+          entities.push(
+            draft({
+              type: "profile",
+              value: check.url,
+              severity: "info",
+              relation: "account-may-exist",
+              source: "handles",
+              title: `${check.site}: ${user}`,
+              meta: { site: check.site, note: "The name is registered. That does not show who operates it." },
+            }),
+          );
+          log.push(`${check.site}: name is registered.`);
+        } else {
+          log.push(`${check.site}: no account.`);
+        }
+      } catch {
+        errors += 1;
+        log.push(`${check.site}: lookup failed.`);
+      }
+    }),
+  );
+  if (!entities.length && errors === checks.length) return fail("handles", started, new Error("Every username site failed."), log);
+  return finish("handles", started, entities, log);
+}
+
 async function runModule(id: string, input: RunInput, domain: string): Promise<ModuleResult> {
   switch (id) {
     case "ct":
@@ -2237,6 +2448,14 @@ async function runModule(id: string, input: RunInput, domain: string): Promise<M
       return modRank(domain);
     case "code":
       return modCode(input.kind, input.target, domain);
+    case "dnssec":
+      return modDnssec(domain);
+    case "blocklist":
+      return modBlocklist(input.kind, input.target, domain);
+    case "green":
+      return modGreen(domain);
+    case "handles":
+      return modHandles(input.target);
     default:
       return fail(id, Date.now(), new Error("Unknown module"));
   }
@@ -2252,9 +2471,9 @@ export async function execute(input: RunInput): Promise<{ results: ModuleResult[
   const target = normalizeTarget(kind, input.target);
   assertTarget(kind, target);
   const domain = hostFrom(kind, target);
-  const hostModules = ["ct", "rdap", "dns", "internetdb", "wayback", "otx", "urlscan", "reputation", "surface", "mail", "bgp", "geo", "pdns", "malware", "rank", "code"];
+  const hostModules = ["ct", "rdap", "dns", "internetdb", "wayback", "otx", "urlscan", "reputation", "surface", "mail", "bgp", "geo", "pdns", "malware", "rank", "code", "dnssec", "blocklist", "green"];
   if (hostModules.some((id) => input.modules.includes(id))) {
-    if (kind !== "ip" && kind !== "email" && kind !== "username" && !isPublicHost(domain)) {
+    if (kind !== "ip" && kind !== "email" && kind !== "username" && kind !== "phone" && !isPublicHost(domain)) {
       throw new Error("Enter a public host.");
     }
   }

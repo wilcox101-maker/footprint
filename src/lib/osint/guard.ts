@@ -67,11 +67,20 @@ export function isUsername(value: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9_-]{1,38}$/.test(value);
 }
 
+export function isPhone(value: string): boolean {
+  const trimmed = value.trim();
+  if (isIp(trimmed)) return false;
+  if (!/^\+?[\d\s().-]{8,22}$/.test(trimmed)) return false;
+  const digits = trimmed.replace(/\D/g, "");
+  return digits.length >= 8 && digits.length <= 15;
+}
+
 export function detectKind(raw: string): Kind {
   const s = raw.trim();
   if (/^https?:\/\//i.test(s)) return "url";
   if (isEmail(s)) return "email";
   if (isIp(s)) return "ip";
+  if (isPhone(s)) return "phone";
   const hostish = s.replace(/^[a-z]+:\/\//i, "").split("/")[0]?.split("?")[0] ?? "";
   const withoutPort = hostish.replace(/:\d+$/, "");
   if (isPublicHost(withoutPort) && withoutPort.includes(".")) return "domain";
@@ -82,6 +91,7 @@ export function normalizeTarget(kind: Kind, raw: string): string {
   let s = raw.trim();
   if (kind === "email") return s.toLowerCase();
   if (kind === "username") return s.replace(/^@/, "");
+  if (kind === "phone") return s.replace(/[^\d+]/g, "");
   if (kind === "ip") return s.replace(/^\[|\]$/g, "").toLowerCase();
   if (kind === "url") {
     if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
@@ -104,6 +114,7 @@ export function hostFrom(kind: Kind, target: string): string {
     }
   }
   if (kind === "email") return target.split("@")[1]?.toLowerCase() ?? "";
+  if (kind === "phone") return "";
   return target.toLowerCase();
 }
 
@@ -115,6 +126,7 @@ export function assertTarget(kind: Kind, target: string): void {
   if (kind === "ip") {
     if (!isIp(target) || isPrivateIp(target)) throw new Error("Enter a public IP address.");
   }
+  if (kind === "phone" && !isPhone(target)) throw new Error("Enter a phone number, with a country code if you can.");
   if (kind === "domain" && !isPublicHost(target)) throw new Error("Enter a public domain name.");
   if (kind === "url") {
     let url: URL;

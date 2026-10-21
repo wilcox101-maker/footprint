@@ -9,4 +9,7 @@ npm install
 npm run dev
 ```
 
-Open the app, enter a domain, email, username, or public IP you are allowed to research, and start a scan.
+Open the app, enter a domain, email, username, phone number, or public IP you are allowed to research, and start a scan.
+
+The write-up is in [docs/Home.md](docs/Home.md): how to run a scan, what each module returns, how to read the risk counts, and how to ask a site to take a listing down.
+

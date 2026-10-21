@@ -1,4 +1,4 @@
-export const KINDS = ["domain", "email", "username", "ip", "url"] as const;
+export const KINDS = ["domain", "email", "username", "ip", "url", "phone"] as const;
 export type Kind = (typeof KINDS)[number];
 
 export const SEVERITIES = ["info", "low", "medium", "high"] as const;
@@ -18,6 +18,7 @@ export const ENTITY_TYPES = [
   "asn",
   "port",
   "cve",
+  "phone",
 ] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 

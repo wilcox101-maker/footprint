@@ -19,6 +19,7 @@ const KINDS: { id: Kind; label: string }[] = [
   { id: "url", label: "URL" },
   { id: "email", label: "Email" },
   { id: "username", label: "Username" },
+  { id: "phone", label: "Phone" },
   { id: "ip", label: "IP" },
 ];
 
@@ -109,7 +110,7 @@ function Home() {
                 <TextInput
                   value={raw}
                   onChange={(e) => onTarget(e.target.value)}
-                  placeholder="example.com, email, username, IP, or URL"
+                  placeholder="example.com, email, username, phone, IP, or URL"
                   aria-label="Scan target"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") open(true);
