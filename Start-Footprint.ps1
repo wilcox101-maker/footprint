@@ -1,9 +1,9 @@
 # From a normal PowerShell window:
-#   irm "https://raw.githubusercontent.com/wilcox101-maker/footprint/main/win.ps1?v=4" | iex
+#   irm "https://raw.githubusercontent.com/wilcox101-maker/footprint/main/win.ps1?v=5" | iex
 # Nothing else has to be installed. The script downloads Node, downloads
 # wilcox101-maker/footprint, installs packages, and opens the app.
 
-Write-Host "Footprint launcher 4"
+Write-Host "Footprint launcher 5"
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -162,10 +162,11 @@ if ($sha -ne $have -or -not (Test-Path -LiteralPath (Join-Path $App "package.jso
   Write-Host "Project is at $App"
 }
 
+Set-Location -LiteralPath $App
 $env:Path = "$NodeHome;" + $env:Path
 if (-not (Test-Path -LiteralPath (Join-Path $App "node_modules"))) {
   Write-Host "Installing packages ..."
-  & $Npm install --prefix $App
+  & $Npm install
   if ($LASTEXITCODE -ne 0) { throw "npm install failed." }
 }
 

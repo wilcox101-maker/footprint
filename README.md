@@ -18,7 +18,7 @@ npm run dev
 On Windows, open PowerShell and paste:
 
 ```powershell
-irm "https://raw.githubusercontent.com/wilcox101-maker/footprint/main/win.ps1?v=4" | iex
+irm "https://raw.githubusercontent.com/wilcox101-maker/footprint/main/win.ps1?v=5" | iex
 ```
 
 That downloads this script and runs it. The script then downloads Node.js, downloads this repo, installs packages, and opens the app. No GitHub token is required while the repo is public. Scans still stay in the browser.
