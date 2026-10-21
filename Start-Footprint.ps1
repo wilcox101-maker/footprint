@@ -3,7 +3,7 @@
 # Nothing else has to be installed. The script downloads Node, downloads
 # wilcox101-maker/footprint, installs packages, and opens the app.
 
-Write-Host "Footprint launcher 5"
+Write-Host "Footprint launcher 6"
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -177,11 +177,19 @@ if (Test-Listen) {
 }
 
 Write-Host "Starting Footprint at $Page"
-$proc = Start-Process -FilePath $Npm -ArgumentList @("run", "dev") -WorkingDirectory $App -PassThru -WindowStyle Hidden
+$log = Join-Path $Root "server.log"
+$errLog = Join-Path $Root "server.err.log"
+Remove-Exact $log
+Remove-Exact $errLog
+$wrapper = Join-Path $App "scripts\with-app-env.mjs"
+$proc = Start-Process -FilePath $NodeExe -ArgumentList @($wrapper, "vite", "dev", "--host", "127.0.0.1", "--port", "8080") -WorkingDirectory $App -RedirectStandardOutput $log -RedirectStandardError $errLog -PassThru
 $deadline = (Get-Date).AddMinutes(3)
 $up = $false
 while ((Get-Date) -lt $deadline) {
-  if ($proc.HasExited) { throw "The app stopped before it opened." }
+  if ($proc.HasExited) {
+    Write-Host (Get-Content -LiteralPath $log, $errLog -ErrorAction SilentlyContinue | Select-Object -Last 40)
+    throw "The app stopped before it opened. The log is in $errLog"
+  }
   if (Test-Listen) { $up = $true; break }
   Start-Sleep -Seconds 1
 }
