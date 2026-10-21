@@ -22,7 +22,7 @@ powershell -ExecutionPolicy Bypass -File .\Start-Footprint.ps1
 The script then:
 
 1. Downloads Node.js into `%LOCALAPPDATA%\Footprint\runtime` if it is not there.
-2. Downloads `wilcox101-maker/footprint` from GitHub. The repo is private, so the first run asks for a personal access token with read access to the repository. The token is stored at `%LOCALAPPDATA%\Footprint\github.token` and is only sent to GitHub.
+2. Downloads `wilcox101-maker/footprint` from GitHub. No token is required while the repo is public. If GitHub ever refuses the download, the script asks for a personal access token and stores it at `%LOCALAPPDATA%\Footprint\github.token`.
 3. Installs packages when `package-lock.json` changes.
 4. Starts the app and opens the browser.
 

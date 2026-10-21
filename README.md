@@ -15,7 +15,7 @@ On a Windows PC with nothing else installed, save [Start-Footprint.ps1](Start-Fo
 powershell -ExecutionPolicy Bypass -File .\Start-Footprint.ps1
 ```
 
-The script downloads Node.js, downloads this private repo, installs packages, and opens the app. The first run asks for a GitHub token that can read the repo. That token stays on the PC. Scans still stay in the browser.
+The script downloads Node.js, downloads this repo, installs packages, and opens the app. No GitHub token is required while the repo is public. Scans still stay in the browser.
 
 Open the app, enter a domain, email, username, phone number, or public IP you are allowed to research, and start a scan.
 

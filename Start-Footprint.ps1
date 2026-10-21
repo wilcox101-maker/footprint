@@ -2,8 +2,6 @@
 #   powershell -ExecutionPolicy Bypass -File .\Start-Footprint.ps1
 # Nothing else has to be installed. The script downloads Node, downloads
 # wilcox101-maker/footprint, installs packages, and opens the app.
-# The repo is private, so the first run asks for a GitHub token that can read it.
-# The token stays in %LOCALAPPDATA%\Footprint\github.token and is not sent anywhere except GitHub.
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -56,12 +54,13 @@ function Read-Token {
 }
 
 function Get-GithubHeaders {
-  return @{
-    Authorization          = "Bearer $script:Token"
+  $headers = @{
     Accept                 = "application/vnd.github+json"
     "User-Agent"           = "Footprint-launcher"
     "X-GitHub-Api-Version" = "2022-11-28"
   }
+  if ($script:Token) { $headers.Authorization = "Bearer $script:Token" }
+  return $headers
 }
 
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
@@ -75,14 +74,22 @@ if (-not (Test-Path $NodeExe)) {
   Remove-Item $zip -Force
 }
 
-$script:Token = Read-Token
+$script:Token = ""
+if (Test-Path $TokenFile) { $script:Token = (Get-Content -Path $TokenFile -Raw).Trim() }
 $headers = Get-GithubHeaders
 
 try {
   $commit = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$Owner/$Repo/commits/$Branch"
 } catch {
   if (Test-Path $TokenFile) { Remove-Item $TokenFile -Force -ErrorAction SilentlyContinue }
-  throw "GitHub refused the token or the repo. Delete nothing else. Run the script again and paste a token that can read $Owner/$Repo."
+  $script:Token = Read-Token
+  $headers = Get-GithubHeaders
+  try {
+    $commit = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$Owner/$Repo/commits/$Branch"
+  } catch {
+    if (Test-Path $TokenFile) { Remove-Item $TokenFile -Force -ErrorAction SilentlyContinue }
+    throw "GitHub refused the download. If the repo is private again, run the script and paste a token that can read $Owner/$Repo."
+  }
 }
 
 $sha = $commit.sha
