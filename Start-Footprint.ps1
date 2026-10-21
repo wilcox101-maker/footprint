@@ -1,7 +1,9 @@
 # From a normal PowerShell window:
-#   irm https://raw.githubusercontent.com/wilcox101-maker/footprint/main/Start-Footprint.ps1 | iex
+#   irm "https://raw.githubusercontent.com/wilcox101-maker/footprint/main/win.ps1?v=4" | iex
 # Nothing else has to be installed. The script downloads Node, downloads
 # wilcox101-maker/footprint, installs packages, and opens the app.
+
+Write-Host "Footprint launcher 4"
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
