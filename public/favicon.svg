@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="6" fill="#1a3348" stroke="#3d4e60" stroke-width="3"/>
+  <text x="32" y="40" text-anchor="middle" fill="#e7ecef" font-family="IBM Plex Sans, Segoe UI, sans-serif" font-size="28" font-weight="500">Fp</text>
+  <text x="32" y="54" text-anchor="middle" fill="#8eabc4" font-family="IBM Plex Sans, Segoe UI, sans-serif" font-size="8" font-weight="500" letter-spacing="1.2">FOOTPRINT</text>
+</svg>

@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-bg: #0c0e11;
+  --color-elevated: #14181d;
+  --color-subtle: #1c2229;
+  --color-fg: #e7ecef;
+  --color-muted: #9aa6b2;
+  --color-faint: #6d7a86;
+  --color-line: #2a323b;
+  --color-line-strong: #3d4854;
+  --color-accent: #e4ebf2;
+  --color-accent-fg: #12161b;
+  --color-info: #8eabc4;
+  --color-ok: #8fbfaa;
+  --color-warn: #c4b48a;
+  --color-danger: #c48b8b;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-info) 35%, transparent);
+    color: var(--color-fg);
+  }
+
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
