@@ -3,7 +3,7 @@
 # Nothing else has to be installed. The script downloads Node, downloads
 # wilcox101-maker/footprint, installs packages, and opens the app.
 
-Write-Host "Footprint launcher 6"
+Write-Host "Footprint launcher 7"
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -163,7 +163,7 @@ if ($sha -ne $have -or -not (Test-Path -LiteralPath (Join-Path $App "package.jso
 }
 
 Set-Location -LiteralPath $App
-$env:Path = "$NodeHome;" + $env:Path
+$env:Path = "$(Join-Path $App 'node_modules\.bin');$NodeHome;" + $env:Path
 if (-not (Test-Path -LiteralPath (Join-Path $App "node_modules"))) {
   Write-Host "Installing packages ..."
   & $Npm install
