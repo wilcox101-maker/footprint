@@ -7,6 +7,22 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# Windows often hands this script an 8.3 path such as C:\Users\D8EF9~1.WIL\...
+# Remove-Item treats the tilde as a wildcard and stops. Use the long path.
+function ConvertTo-LongPath([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) { return $Path }
+  try {
+    $fso = New-Object -ComObject Scripting.FileSystemObject
+    if ($fso.FolderExists($Path)) { return $fso.GetFolder($Path).Path }
+    $parent = Split-Path -Path $Path -Parent
+    $leaf = Split-Path -Path $Path -Leaf
+    if ($parent -and $fso.FolderExists($parent)) { return (Join-Path $fso.GetFolder($parent).Path $leaf) }
+  } catch {}
+  return $Path
+}
+$env:TEMP = ConvertTo-LongPath $env:TEMP
+$env:LOCALAPPDATA = ConvertTo-LongPath $env:LOCALAPPDATA
+
 $Owner = "wilcox101-maker"
 $Repo = "footprint"
 $Branch = "main"
@@ -67,11 +83,11 @@ New-Item -ItemType Directory -Force -Path $Root | Out-Null
 
 if (-not (Test-Path $NodeExe)) {
   Write-Host "Downloading Node.js $NodeVersion ..."
-  $zip = Join-Path $env:TEMP "node-v$NodeVersion-win-x64.zip"
-  Invoke-WebRequest -Uri "https://nodejs.org/dist/v$NodeVersion/node-v$NodeVersion-win-x64.zip" -OutFile $zip
+  $zip = Join-Path $env:TEMP "node-v${NodeVersion}-win-x64.zip"
+  Invoke-WebRequest -Uri "https://nodejs.org/dist/v${NodeVersion}/node-v${NodeVersion}-win-x64.zip" -OutFile $zip
   New-Item -ItemType Directory -Force -Path (Join-Path $Root "runtime") | Out-Null
-  Expand-Archive -Path $zip -DestinationPath (Join-Path $Root "runtime") -Force
-  Remove-Item $zip -Force
+  Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $Root "runtime") -Force
+  Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
 }
 
 $script:Token = ""
@@ -81,13 +97,13 @@ $headers = Get-GithubHeaders
 try {
   $commit = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$Owner/$Repo/commits/$Branch"
 } catch {
-  if (Test-Path $TokenFile) { Remove-Item $TokenFile -Force -ErrorAction SilentlyContinue }
+  if (Test-Path -LiteralPath $TokenFile) { Remove-Item -LiteralPath $TokenFile -Force -ErrorAction SilentlyContinue }
   $script:Token = Read-Token
   $headers = Get-GithubHeaders
   try {
     $commit = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$Owner/$Repo/commits/$Branch"
   } catch {
-    if (Test-Path $TokenFile) { Remove-Item $TokenFile -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $TokenFile) { Remove-Item -LiteralPath $TokenFile -Force -ErrorAction SilentlyContinue }
     throw "GitHub refused the download. If the repo is private again, run the script and paste a token that can read $Owner/$Repo."
   }
 }
@@ -106,26 +122,26 @@ if ($sha -ne $have -or -not (Test-Path (Join-Path $App "package.json"))) {
   $zip = Join-Path $env:TEMP "footprint-src.zip"
   Invoke-WebRequest -Headers $headers -Uri "https://api.github.com/repos/$Owner/$Repo/zipball/$Branch" -OutFile $zip
   $staging = Join-Path $Root "staging"
-  if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
-  Expand-Archive -Path $zip -DestinationPath $staging -Force
-  Remove-Item $zip -Force
-  $extracted = Get-ChildItem -Path $staging -Directory | Select-Object -First 1
+  if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+  Expand-Archive -LiteralPath $zip -DestinationPath $staging -Force
+  Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+  $extracted = Get-ChildItem -LiteralPath $staging -Directory | Select-Object -First 1
   if (-not $extracted) { throw "The GitHub download did not contain the project." }
 
   $oldModules = Join-Path $App "node_modules"
   $keptModules = Join-Path $Root "node_modules.keep"
-  if (Test-Path $keptModules) { Remove-Item $keptModules -Recurse -Force }
+  if (Test-Path -LiteralPath $keptModules) { Remove-Item -LiteralPath $keptModules -Recurse -Force }
   $oldLock = Join-Path $App "package-lock.json"
   $newLock = Join-Path $extracted.FullName "package-lock.json"
   $sameLock = $false
-  if ((Test-Path $oldLock) -and (Test-Path $newLock) -and (Test-Path $oldModules)) {
-    $sameLock = (Get-FileHash $oldLock).Hash -eq (Get-FileHash $newLock).Hash
-    if ($sameLock) { Move-Item $oldModules $keptModules }
+  if ((Test-Path -LiteralPath $oldLock) -and (Test-Path -LiteralPath $newLock) -and (Test-Path -LiteralPath $oldModules)) {
+    $sameLock = (Get-FileHash -LiteralPath $oldLock).Hash -eq (Get-FileHash -LiteralPath $newLock).Hash
+    if ($sameLock) { Move-Item -LiteralPath $oldModules -Destination $keptModules }
   }
-  if (Test-Path $App) { Remove-Item $App -Recurse -Force }
-  Move-Item $extracted.FullName $App
-  if ($sameLock) { Move-Item $keptModules (Join-Path $App "node_modules") }
-  Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath $App) { Remove-Item -LiteralPath $App -Recurse -Force }
+  Move-Item -LiteralPath $extracted.FullName -Destination $App
+  if ($sameLock) { Move-Item -LiteralPath $keptModules -Destination (Join-Path $App "node_modules") }
+  Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
   Set-Content -Path $ShaFile -Value $sha -NoNewline
   Write-Host "Project is at $App"
 }
