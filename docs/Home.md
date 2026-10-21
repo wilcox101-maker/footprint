@@ -4,6 +4,8 @@ Footprint is a local web app for looking up what is already public about a domai
 
 Use it on your own assets, or on a target you are allowed to research. The app states that on every investigation. Unauthorized scanning is your responsibility, not the software’s.
 
+![New scan](images/home.png)
+
 ## What a scan gives you
 
 * An overall risk of Critical, High, Medium, Low, or Info, plus a count of each.

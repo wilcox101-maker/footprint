@@ -4,6 +4,12 @@ Local digital-footprint scans from public sources. Findings stay in this browser
 
 A scan reports a risk level, breach titles, public profiles, published registration contacts, and how to take a listing down. It does not collect password values, national identity numbers, or dump contents.
 
+![New scan](docs/images/home.png)
+
+![Sample investigation for example.com](docs/images/scan.png)
+
+The investigation shot is sample data, not a live result.
+
 ```bash
 npm install
 npm run dev

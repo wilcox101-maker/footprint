@@ -2,6 +2,10 @@
 
 Open an investigation from the home list. The tabs are Overview, Findings, Assets, Leaks, Footprint, Graph, and Report.
 
+![Sample investigation](images/scan.png)
+
+The picture above is sample data for `example.com`, so the counts are not a real assessment.
+
 ## Risk
 
 The strip under scan progress counts findings, not “tests run.”

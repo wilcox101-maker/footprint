@@ -4,6 +4,8 @@
 
 The real request is on the investigation’s **Footprint** tab.
 
+![Removal steps](images/removal.png)
+
 ## Steps
 
 1. Search your own name on the broker and copy every listing URL. One person often has several.

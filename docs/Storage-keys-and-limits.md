@@ -1,5 +1,7 @@
 # Storage, keys, and limits
 
+![Settings](images/settings.png)
+
 ## Where data lives
 
 Investigations, findings, monitors, the activity log, and settings are in the browser’s local storage under `footprint.vault.v1`. An older `fieldnote.vault.v1` store is copied across the first time Footprint opens.
