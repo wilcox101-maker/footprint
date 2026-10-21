@@ -13,7 +13,7 @@ import { byRisk, howToFix, overallRisk, riskCounts, riskOf, whatItMeans, type Ri
 import { exposureRows } from "@/lib/osint/exposure";
 import { reportCsv, reportHtml, reportJson, reportMarkdown } from "@/lib/osint/report";
 import { runBusy, runCase } from "@/lib/osint/run-client";
-import { displayEntity, listingMatches, maskText, removalLetter, removalMailto, TAKEDOWN_LINKS, TAKEDOWN_METHOD, type RemovalLink } from "@/lib/osint/sensitive";
+import { displayEntity, listingMatches, maskText, matchBroker, removalLetter, removalMailto, TAKEDOWN_LINKS } from "@/lib/osint/sensitive";
 import {
   deleteCase,
   purgeHistorical,
@@ -82,6 +82,7 @@ function CasePage() {
   const [removeName, setRemoveName] = useState("");
   const [removeEmail, setRemoveEmail] = useState("");
   const [listingUrl, setListingUrl] = useState("");
+  const [pickedBroker, setPickedBroker] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -167,52 +168,53 @@ function CasePage() {
     saveModules(file.id, next, authorized);
   }
 
-  function requestRemoval(link: RemovalLink, channel: "mail" | "form") {
+  function sendRemoval(channel: "mail" | "form") {
     if (!file) return;
     const name = removeName.trim();
     const email = removeEmail.trim();
     const url = listingUrl.trim();
-    if (channel === "form") {
-      if (url) recordRemoval(file.id, { broker: link.title, channel: "form", listingUrl: url });
-      window.open(link.href, "_blank", "noopener,noreferrer");
-      toast(url ? "Official form opened. Finish it there, then confirm the broker’s email." : "Official form opened.");
+    const detected = matchBroker(url);
+    const broker = detected ?? TAKEDOWN_LINKS.find((link) => link.href === pickedBroker) ?? null;
+    if (!broker) {
+      toast("Paste the listing URL, or choose the site.");
       return;
     }
-    if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !url) {
-      toast("Enter your name, an email you can confirm, and the listing URL.");
+    if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      toast("Enter the name on the listing and an email you can open.");
       return;
     }
     let parsed: URL;
     try {
       parsed = new URL(url);
     } catch {
-      toast("Paste a full listing URL, including https://.");
+      toast("Paste the full listing address, starting with https://.");
       return;
     }
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      toast("The listing URL has to be a web address.");
+      toast("The listing address has to be a web page.");
       return;
     }
-    if (channel === "mail") {
-      if (!link.mail) {
-        toast("This broker has no published mailbox. Open the official form.");
-        return;
-      }
-      if (!listingMatches(link, url)) {
-        toast(`That listing is not on ${link.hosts?.join(" or ")}.`);
-        return;
-      }
-      const href = removalMailto(link, { name, email, listingUrl: url, target: file.target, kind: file.kind });
+    if (broker.hosts?.length && !listingMatches(broker, url)) {
+      toast(`That page is not on ${broker.hosts.join(" or ")}.`);
+      return;
+    }
+    const letter = removalLetter({ target: file.target, kind: file.kind, name, email, listingUrl: url, broker: broker.title });
+    void navigator.clipboard.writeText(letter).catch(() => undefined);
+    if (channel === "mail" && broker.mail) {
+      const href = removalMailto(broker, { name, email, listingUrl: url, target: file.target, kind: file.kind });
       if (!href) return;
-      recordRemoval(file.id, { broker: link.title, channel: "mail", listingUrl: url });
+      recordRemoval(file.id, { broker: broker.title, channel: "mail", listingUrl: url });
       window.location.href = href;
-      toast("Opened in your mail app. You still have to send it.");
+      toast("Your mail app is opening. Send the message, then click the confirmation the site emails you.");
       return;
     }
-    recordRemoval(file.id, { broker: link.title, channel: "form", listingUrl: url });
-    window.open(link.href, "_blank", "noopener,noreferrer");
-    toast("Official form opened. Finish it there, then confirm the broker’s email.");
+    recordRemoval(file.id, { broker: broker.title, channel: "form", listingUrl: url });
+    window.open(broker.href, "_blank", "noopener,noreferrer");
+    toast("The site’s form is open and the letter is copied. Paste the listing there, then click their confirmation email.");
   }
+
+  const detectedBroker = matchBroker(listingUrl);
+  const chosenBroker = detectedBroker ?? TAKEDOWN_LINKS.find((link) => link.href === pickedBroker) ?? null;
 
   return (
     <Shell>
@@ -621,94 +623,82 @@ function CasePage() {
             </p>
           </Panel>
           <Panel>
-            <h2 className="text-base font-medium">How to take a listing down</h2>
-            <p className="mt-2 text-sm text-muted">
-              These steps remove data from the website or broker that published it. Clearing this browser does not.
-            </p>
-            <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-muted">
-              {TAKEDOWN_METHOD.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-          </Panel>
-          <Panel>
-            <h2 className="text-base font-medium">Send a removal request</h2>
+            <h2 className="text-base font-medium">Take a listing down</h2>
             <p className="mt-1 text-sm text-muted">
-              Spokeo, BeenVerified, and Whitepages publish a privacy mailbox. This opens that message in your mail app, or opens the broker’s form. Footprint cannot pass a captcha or click the confirmation link the broker sends you.
+              Paste one listing. Footprint names the site, copies the letter, and opens the request. You still send it and click the confirmation email. This does not clear the row in this browser.
             </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <TextInput value={removeName} onChange={(e) => setRemoveName(e.target.value)} placeholder="Name on the listing" aria-label="Name on the listing" />
-              <TextInput value={removeEmail} onChange={(e) => setRemoveEmail(e.target.value)} placeholder="Email you can confirm" aria-label="Email for the broker confirmation" inputMode="email" />
-              <TextInput value={listingUrl} onChange={(e) => setListingUrl(e.target.value)} placeholder="https:// listing URL" aria-label="Listing URL" inputMode="url" />
+            <ol className="mt-4 space-y-3">
+              <li>
+                <label className="text-xs text-faint" htmlFor="listing-url">
+                  1. Listing address
+                </label>
+                <TextInput
+                  id="listing-url"
+                  className="mt-1"
+                  value={listingUrl}
+                  onChange={(e) => setListingUrl(e.target.value)}
+                  placeholder="https://www.spokeo.com/…"
+                  inputMode="url"
+                />
+                {detectedBroker ? (
+                  <p className="mt-1 text-sm text-fg">This page is on {detectedBroker.title.replace(/ opt-out| suppression| removal/i, "")}.</p>
+                ) : (
+                  <SelectInput className="mt-2" aria-label="Site that published the listing" value={pickedBroker} onChange={(e) => setPickedBroker(e.target.value)}>
+                    <option value="">Choose the site if the address was not recognized</option>
+                    {TAKEDOWN_LINKS.map((link) => (
+                      <option key={link.href} value={link.href}>
+                        {link.title}
+                      </option>
+                    ))}
+                  </SelectInput>
+                )}
+              </li>
+              <li className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs text-faint">
+                  2. Name on the listing
+                  <TextInput className="mt-1" value={removeName} onChange={(e) => setRemoveName(e.target.value)} placeholder="As the page shows it" />
+                </label>
+                <label className="text-xs text-faint">
+                  3. Email you can open today
+                  <TextInput className="mt-1" value={removeEmail} onChange={(e) => setRemoveEmail(e.target.value)} placeholder="For the site’s confirmation" inputMode="email" />
+                </label>
+              </li>
+            </ol>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {chosenBroker?.mail ? (
+                <Button type="button" onClick={() => sendRemoval("mail")}>
+                  Email the removal request
+                </Button>
+              ) : null}
+              <Button type="button" variant={chosenBroker?.mail ? "line" : "solid"} onClick={() => sendRemoval("form")}>
+                Open the site’s form
+              </Button>
             </div>
+            <p className="mt-3 text-sm text-muted">Next: send the message if your mail app opened, then click the confirmation that site sends. Do not upload a Social Security card. Paste the next listing when you have one.</p>
             {(file.removals ?? []).length ? (
               <ul className="mt-3 space-y-1 text-xs text-muted">
-                {(file.removals ?? []).slice(0, 8).map((row) => (
+                {(file.removals ?? []).slice(0, 6).map((row) => (
                   <li key={`${row.at}-${row.broker}`}>
-                    {format(new Date(row.at), "d MMM HH:mm")} · {row.broker} · {row.channel === "mail" ? "opened in your mail app" : "official form opened"}
+                    {format(new Date(row.at), "d MMM HH:mm")} · {row.broker} · {row.channel === "mail" ? "mail app opened" : "form opened"}
                   </li>
                 ))}
               </ul>
             ) : null}
           </Panel>
-          {["Search engines", "Data brokers", "Phones, mail, and credit"].map((group) => (
-            <Panel key={group}>
-              <h2 className="text-base font-medium">{group}</h2>
-              <ul className="mt-3 space-y-3">
-                {TAKEDOWN_LINKS.filter((link) => link.group === group).map((link) => (
-                  <li key={link.href} className="border-b border-line pb-3">
-                    <p className="text-sm font-medium text-fg">{link.title}</p>
-                    <p className="mt-1 text-sm text-muted">{link.detail}</p>
-                    <div className="mt-1 flex flex-wrap gap-3">
-                      {link.mail ? (
-                        <button type="button" className="min-h-11 text-sm text-info" onClick={() => requestRemoval(link, "mail")}>
-                          Email {link.mail}
-                        </button>
-                      ) : null}
-                      <button type="button" className="min-h-11 text-sm text-info" onClick={() => requestRemoval(link, "form")}>
-                        Open official form
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Panel>
-          ))}
-          <Panel>
-            <h2 className="text-base font-medium">Letter if the form is ignored</h2>
-            <p className="mt-1 text-sm text-muted">
-              Send this to the site’s privacy contact for {file.target}. Attach the listing URL. Do not attach an identity number.
-            </p>
-            <Button
-              type="button"
-              className="mt-3"
-              variant="line"
-              onClick={() => {
-                const letter = removalLetter({
-                  target: file.target,
-                  kind: file.kind,
-                  name: removeName,
-                  email: removeEmail,
-                  listingUrl,
-                });
-                void navigator.clipboard.writeText(letter).then(
-                  () => toast("Takedown request copied"),
-                  () => toast("Could not copy. Select the letter below."),
-                );
-              }}
-            >
-              Copy takedown request
-            </Button>
-            <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-2xl bg-bg p-3 font-mono text-xs text-muted">
-              {removalLetter({
-                target: file.target,
-                kind: file.kind,
-                name: removeName,
-                email: removeEmail,
-                listingUrl,
-              })}
-            </pre>
-          </Panel>
+          <details className="rounded-3xl border border-line bg-elevated p-4 sm:p-5">
+            <summary className="cursor-pointer text-sm font-medium text-fg">Other official pages</summary>
+            <ul className="mt-3 space-y-3">
+              {TAKEDOWN_LINKS.map((link) => (
+                <li key={link.href} className="border-b border-line pb-3">
+                  <p className="text-sm text-fg">{link.title}</p>
+                  <p className="mt-1 text-sm text-muted">{link.detail}</p>
+                  <a href={link.href} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-11 items-center text-sm text-info">
+                    Open page
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
         </div>
       ) : null}
 

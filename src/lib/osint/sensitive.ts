@@ -216,3 +216,10 @@ export function listingMatches(link: RemovalLink, listingUrl: string): boolean {
   }
 }
 
+/** The broker whose site this listing URL is on, if we know that site. */
+export function matchBroker(listingUrl: string): RemovalLink | null {
+  const url = listingUrl.trim();
+  if (!url) return null;
+  return TAKEDOWN_LINKS.find((link) => link.hosts?.length && listingMatches(link, url)) ?? null;
+}
+
