@@ -7,18 +7,19 @@ import { CountBars, DayLine } from "@/components/footprint/charts";
 import { ExposureBoard } from "@/components/footprint/exposure-board";
 import { GraphPanel } from "@/components/footprint/graph-panel";
 import { Shell } from "@/components/footprint/shell";
-import { Button, Panel, SelectInput, TextArea } from "@/components/footprint/ui";
+import { Button, Panel, SelectInput, TextArea, TextInput } from "@/components/footprint/ui";
 import { modulesFor, type ModuleDef } from "@/lib/osint/catalog";
 import { byRisk, howToFix, overallRisk, riskCounts, riskOf, whatItMeans, type RiskLevel } from "@/lib/osint/findings";
 import { exposureRows } from "@/lib/osint/exposure";
 import { reportCsv, reportHtml, reportJson, reportMarkdown } from "@/lib/osint/report";
 import { runBusy, runCase } from "@/lib/osint/run-client";
-import { deletionLetter, displayEntity, maskText, TAKEDOWN_LINKS, TAKEDOWN_METHOD } from "@/lib/osint/sensitive";
+import { displayEntity, listingMatches, maskText, removalLetter, removalMailto, TAKEDOWN_LINKS, TAKEDOWN_METHOD, type RemovalLink } from "@/lib/osint/sensitive";
 import {
   deleteCase,
   purgeHistorical,
   removeEntity,
   removeMonitor,
+  recordRemoval,
   saveModules,
   saveNotes,
   upsertMonitor,
@@ -78,6 +79,9 @@ function CasePage() {
   const [running, setRunning] = useState(false);
   const [notes, setNotes] = useState("");
   const [schedule, setSchedule] = useState<Schedule>("daily");
+  const [removeName, setRemoveName] = useState("");
+  const [removeEmail, setRemoveEmail] = useState("");
+  const [listingUrl, setListingUrl] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -161,6 +165,53 @@ function CasePage() {
     const next = on ? [...new Set([...file.modules, id])] : file.modules.filter((m) => m !== id);
     const authorized = next.includes("surface") ? file.authorized : false;
     saveModules(file.id, next, authorized);
+  }
+
+  function requestRemoval(link: RemovalLink, channel: "mail" | "form") {
+    if (!file) return;
+    const name = removeName.trim();
+    const email = removeEmail.trim();
+    const url = listingUrl.trim();
+    if (channel === "form") {
+      if (url) recordRemoval(file.id, { broker: link.title, channel: "form", listingUrl: url });
+      window.open(link.href, "_blank", "noopener,noreferrer");
+      toast(url ? "Official form opened. Finish it there, then confirm the broker’s email." : "Official form opened.");
+      return;
+    }
+    if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !url) {
+      toast("Enter your name, an email you can confirm, and the listing URL.");
+      return;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      toast("Paste a full listing URL, including https://.");
+      return;
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      toast("The listing URL has to be a web address.");
+      return;
+    }
+    if (channel === "mail") {
+      if (!link.mail) {
+        toast("This broker has no published mailbox. Open the official form.");
+        return;
+      }
+      if (!listingMatches(link, url)) {
+        toast(`That listing is not on ${link.hosts?.join(" or ")}.`);
+        return;
+      }
+      const href = removalMailto(link, { name, email, listingUrl: url, target: file.target, kind: file.kind });
+      if (!href) return;
+      recordRemoval(file.id, { broker: link.title, channel: "mail", listingUrl: url });
+      window.location.href = href;
+      toast("Opened in your mail app. You still have to send it.");
+      return;
+    }
+    recordRemoval(file.id, { broker: link.title, channel: "form", listingUrl: url });
+    window.open(link.href, "_blank", "noopener,noreferrer");
+    toast("Official form opened. Finish it there, then confirm the broker’s email.");
   }
 
   return (
@@ -580,6 +631,26 @@ function CasePage() {
               ))}
             </ol>
           </Panel>
+          <Panel>
+            <h2 className="text-base font-medium">Send a removal request</h2>
+            <p className="mt-1 text-sm text-muted">
+              Spokeo, BeenVerified, and Whitepages publish a privacy mailbox. This opens that message in your mail app, or opens the broker’s form. Footprint cannot pass a captcha or click the confirmation link the broker sends you.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <TextInput value={removeName} onChange={(e) => setRemoveName(e.target.value)} placeholder="Name on the listing" aria-label="Name on the listing" />
+              <TextInput value={removeEmail} onChange={(e) => setRemoveEmail(e.target.value)} placeholder="Email you can confirm" aria-label="Email for the broker confirmation" inputMode="email" />
+              <TextInput value={listingUrl} onChange={(e) => setListingUrl(e.target.value)} placeholder="https:// listing URL" aria-label="Listing URL" inputMode="url" />
+            </div>
+            {(file.removals ?? []).length ? (
+              <ul className="mt-3 space-y-1 text-xs text-muted">
+                {(file.removals ?? []).slice(0, 8).map((row) => (
+                  <li key={`${row.at}-${row.broker}`}>
+                    {format(new Date(row.at), "d MMM HH:mm")} · {row.broker} · {row.channel === "mail" ? "opened in your mail app" : "official form opened"}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </Panel>
           {["Search engines", "Data brokers", "Phones, mail, and credit"].map((group) => (
             <Panel key={group}>
               <h2 className="text-base font-medium">{group}</h2>
@@ -588,9 +659,16 @@ function CasePage() {
                   <li key={link.href} className="border-b border-line pb-3">
                     <p className="text-sm font-medium text-fg">{link.title}</p>
                     <p className="mt-1 text-sm text-muted">{link.detail}</p>
-                    <a href={link.href} target="_blank" rel="noreferrer" className="mt-1 inline-flex min-h-11 items-center text-sm text-info">
-                      Open official page
-                    </a>
+                    <div className="mt-1 flex flex-wrap gap-3">
+                      {link.mail ? (
+                        <button type="button" className="min-h-11 text-sm text-info" onClick={() => requestRemoval(link, "mail")}>
+                          Email {link.mail}
+                        </button>
+                      ) : null}
+                      <button type="button" className="min-h-11 text-sm text-info" onClick={() => requestRemoval(link, "form")}>
+                        Open official form
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -606,7 +684,13 @@ function CasePage() {
               className="mt-3"
               variant="line"
               onClick={() => {
-                const letter = deletionLetter(file.target, file.kind);
+                const letter = removalLetter({
+                  target: file.target,
+                  kind: file.kind,
+                  name: removeName,
+                  email: removeEmail,
+                  listingUrl,
+                });
                 void navigator.clipboard.writeText(letter).then(
                   () => toast("Takedown request copied"),
                   () => toast("Could not copy. Select the letter below."),
@@ -616,7 +700,13 @@ function CasePage() {
               Copy takedown request
             </Button>
             <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-2xl bg-bg p-3 font-mono text-xs text-muted">
-              {deletionLetter(file.target, file.kind)}
+              {removalLetter({
+                target: file.target,
+                kind: file.kind,
+                name: removeName,
+                email: removeEmail,
+                listingUrl,
+              })}
             </pre>
           </Panel>
         </div>

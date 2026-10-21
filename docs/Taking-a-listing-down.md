@@ -9,7 +9,7 @@ The real request is on the investigation’s **Footprint** tab.
 ## Steps
 
 1. Search your own name on the broker and copy every listing URL. One person often has several.
-2. Under **Data brokers**, open the official page for that site. Paste the listing URL. Confirm the email or text the same day. Do not upload a Social Security card.
+2. On the **Footprint** tab, fill in your name, an email you can confirm, and the listing URL. For Spokeo, BeenVerified, and Whitepages, **Email** opens a request in your mail app to the privacy address that broker publishes. You still have to send the message. The broker then sends a confirmation you must click. **Open official form** is the captcha path. Footprint does not submit either one by itself.
 3. After the listing is gone, use **Google Results about you** so the cached result drops. Google does not delete the broker’s copy.
 4. If you live in California, file one [DROP](https://privacy.ca.gov/DROP) request, then still opt out of sites DROP does not cover. DROP is for California residents. It does not cover a Michigan address.
 5. Look again in a few months. A new public record can recreate the listing.

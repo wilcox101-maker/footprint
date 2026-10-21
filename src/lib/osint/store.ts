@@ -9,6 +9,7 @@ import type {
   LogLevel,
   ModuleResult,
   Monitor,
+  RemovalAttempt,
   Schedule,
   Settings,
   Severity,
@@ -330,6 +331,13 @@ export function deleteCase(id: string) {
 export function saveNotes(id: string, notes: string) {
   patchCase(id, (c) => {
     c.notes = notes.slice(0, 4000);
+  });
+}
+
+export function recordRemoval(id: string, attempt: Omit<RemovalAttempt, "at">) {
+  patchCase(id, (c) => {
+    const row: RemovalAttempt = { ...attempt, at: new Date().toISOString() };
+    c.removals = [row, ...(c.removals ?? [])].slice(0, 40);
   });
 }
 

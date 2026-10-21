@@ -34,7 +34,16 @@ export function maskText(value: string): string {
     .replace(/\+\d[\d\s().-]{6,}\d/g, "phone hidden");
 }
 
-export type RemovalLink = { group: string; title: string; detail: string; href: string };
+export type RemovalLink = {
+  group: string;
+  title: string;
+  detail: string;
+  href: string;
+  /** Published privacy mailbox. Present only when the broker's own site lists it. */
+  mail?: string;
+  /** Listing URL must be on one of these hosts before a mail request is opened. */
+  hosts?: string[];
+};
 
 /** Official takedown and opt-out pages. These remove a listing from that site or from search, not from this browser. */
 export const TAKEDOWN_LINKS: RemovalLink[] = [
@@ -55,6 +64,8 @@ export const TAKEDOWN_LINKS: RemovalLink[] = [
     title: "Spokeo opt-out",
     detail: "Search your name, copy the listing URL, paste it on the opt-out form, and confirm the email. Also covers some Spokeo-run directories, not every sister site.",
     href: "https://www.spokeo.com/optout",
+    mail: "privacy@spokeo.com",
+    hosts: ["spokeo.com"],
   },
   {
     group: "Data brokers",
@@ -67,12 +78,16 @@ export const TAKEDOWN_LINKS: RemovalLink[] = [
     title: "BeenVerified opt-out",
     detail: "Submit the listing, then use the confirmation link. PeopleLooker and PeopleSmart are related but often need their own form.",
     href: "https://www.beenverified.com/app/optout/search",
+    mail: "privacy@beenverified.com",
+    hosts: ["beenverified.com"],
   },
   {
     group: "Data brokers",
     title: "Whitepages suppression",
     detail: "Paste the listing URL. The faster path asks for a phone verification. 411.com uses the same company.",
     href: "https://www.whitepages.com/suppression-requests",
+    mail: "privacyrequest@whitepages.com",
+    hosts: ["whitepages.com", "411.com"],
   },
   {
     group: "Data brokers",
@@ -152,16 +167,52 @@ export const TAKEDOWN_METHOD = [
 ];
 
 export function deletionLetter(target: string, kind: string): string {
+  return removalLetter({ target, kind });
+}
+
+export function removalLetter(input: {
+  target: string;
+  kind: string;
+  name?: string;
+  email?: string;
+  listingUrl?: string;
+  broker?: string;
+}): string {
   const today = new Date().toISOString().slice(0, 10);
+  const who = input.name?.trim() || input.target;
+  const listing = input.listingUrl?.trim();
+  const email = input.email?.trim();
   return `Subject: Please delete personal information
 
 Date: ${today}
 
-I am requesting that you delete the personal information you publish about ${target} (${kind}), including any people-search profile, cached copy, and resale of that profile.
-
-Please remove the public listing, stop selling or resharing it, and confirm in writing when that is done. If you need the listing URL, I will send the page address. Do not ask me to send a Social Security number.
+I am requesting that you delete the personal information you publish about ${who} (${input.kind}${input.broker ? `, ${input.broker}` : ""}), including any people-search profile, cached copy, and resale of that profile.
+${listing ? `\nListing: ${listing}\n` : ""}
+Please remove the public listing, stop selling or resharing it, and confirm in writing when that is done.${email ? ` Reply to ${email}.` : ""} Do not ask me to send a Social Security number.
 
 I am authorized to make this request. It does not ask you to hide a crime, alter a court record the law requires you to keep, or delete someone else’s information without their permission.
 
 Thank you.`;
 }
+
+/** Mailto for a broker that publishes a privacy mailbox. Returns null when this broker has no such address. */
+export function removalMailto(
+  link: RemovalLink,
+  input: { name: string; email: string; listingUrl: string; target: string; kind: string },
+): string | null {
+  if (!link.mail) return null;
+  const body = removalLetter({ ...input, broker: link.title });
+  const subject = `Delete my listing on ${link.title}`;
+  return `mailto:${link.mail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+export function listingMatches(link: RemovalLink, listingUrl: string): boolean {
+  if (!link.hosts?.length) return true;
+  try {
+    const host = new URL(listingUrl).hostname.replace(/^www\./, "").toLowerCase();
+    return link.hosts.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+  } catch {
+    return false;
+  }
+}
+

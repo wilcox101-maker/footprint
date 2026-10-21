@@ -57,6 +57,13 @@ export type Scan = {
   log: string;
 };
 
+export type RemovalAttempt = {
+  at: string;
+  broker: string;
+  channel: "mail" | "form";
+  listingUrl: string;
+};
+
 export type CaseFile = {
   id: string;
   name: string;
@@ -70,6 +77,8 @@ export type CaseFile = {
   entities: Entity[];
   edges: Edge[];
   scans: Scan[];
+  /** Requests the operator opened. Not a receipt from the broker. */
+  removals?: RemovalAttempt[];
 };
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
