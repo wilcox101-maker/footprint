@@ -9,6 +9,16 @@ npm install
 npm run dev
 ```
 
+On a Windows PC with nothing else installed, save [Start-Footprint.ps1](Start-Footprint.ps1) and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Start-Footprint.ps1
+```
+
+The script downloads Node.js, downloads this private repo, installs packages, and opens the app. The first run asks for a GitHub token that can read the repo. That token stays on the PC. Scans still stay in the browser.
+
+Open the app, enter a domain, email, username, phone number, or public IP you are allowed to research, and start a scan.
+
 Open the app, enter a domain, email, username, phone number, or public IP you are allowed to research, and start a scan.
 
 The write-up is in [docs/Home.md](docs/Home.md): how to run a scan, what each module returns, how to read the risk counts, and how to ask a site to take a listing down.
