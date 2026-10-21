@@ -1,5 +1,5 @@
-# Save this file anywhere and run:
-#   powershell -ExecutionPolicy Bypass -File .\Start-Footprint.ps1
+# From a normal PowerShell window:
+#   irm https://raw.githubusercontent.com/wilcox101-maker/footprint/main/Start-Footprint.ps1 | iex
 # Nothing else has to be installed. The script downloads Node, downloads
 # wilcox101-maker/footprint, installs packages, and opens the app.
 

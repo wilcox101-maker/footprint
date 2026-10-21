@@ -9,13 +9,13 @@ npm install
 npm run dev
 ```
 
-On a Windows PC with nothing else installed, save [Start-Footprint.ps1](Start-Footprint.ps1) and run:
+On Windows, open PowerShell and paste:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Start-Footprint.ps1
+irm https://raw.githubusercontent.com/wilcox101-maker/footprint/main/Start-Footprint.ps1 | iex
 ```
 
-The script downloads Node.js, downloads this repo, installs packages, and opens the app. No GitHub token is required while the repo is public. Scans still stay in the browser.
+That downloads this script and runs it. The script then downloads Node.js, downloads this repo, installs packages, and opens the app. No GitHub token is required while the repo is public. Scans still stay in the browser.
 
 Open the app, enter a domain, email, username, phone number, or public IP you are allowed to research, and start a scan.
 

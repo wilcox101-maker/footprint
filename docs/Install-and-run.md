@@ -11,15 +11,15 @@ npm run dev
 
 Open the address the dev server prints. Scans you start are stored in that browser.
 
-## Windows, one script, no prior download
+## Windows, one command
 
-Save `Start-Footprint.ps1` anywhere. You do not need Git, Node, or a clone already on the machine.
+Open PowerShell and paste:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\Start-Footprint.ps1
+irm https://raw.githubusercontent.com/wilcox101-maker/footprint/main/Start-Footprint.ps1 | iex
 ```
 
-The script then:
+Nothing else has to be installed or saved first. The command downloads [Start-Footprint.ps1](https://github.com/wilcox101-maker/footprint/blob/main/Start-Footprint.ps1) and runs it. The script then:
 
 1. Downloads Node.js into `%LOCALAPPDATA%\Footprint\runtime` if it is not there.
 2. Downloads `wilcox101-maker/footprint` from GitHub. No token is required while the repo is public. If GitHub ever refuses the download, the script asks for a personal access token and stores it at `%LOCALAPPDATA%\Footprint\github.token`.
